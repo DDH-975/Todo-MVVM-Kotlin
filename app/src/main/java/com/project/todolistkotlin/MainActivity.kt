@@ -1,6 +1,7 @@
 package com.project.todolistkotlin
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -8,12 +9,15 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.project.todolistkotlin.databinding.ActivityMainBinding
+import com.project.todolistkotlin.roomDB.TodoEntity
+import com.project.todolistkotlin.roomDB.TodoRepository
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding : ActivityMainBinding
+    private lateinit var binding: ActivityMainBinding
     private lateinit var todoAdapter: TodoAdapter
     private lateinit var todoViewModel: TodoViewModel
     private lateinit var managerLayout: LinearLayoutManager
+    private lateinit var repo: TodoRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,27 +30,39 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        repo = TodoRepository.getInstance(application)
         todoViewModel = ViewModelProvider(
             this,
-            ViewModelProvider.AndroidViewModelFactory.getInstance(application)
+            TodoViewModelFactory(repo)
         )[TodoViewModel::class.java]
 
         managerLayout = LinearLayoutManager(this)
 
-        val testData = mutableListOf<String>()
-        testData.add("테스트 데이터1")
-        testData.add("테스트 데이터2")
+        todoAdapter = TodoAdapter { id ->
+            todoViewModel.deleteById(id)
+        }
 
-        todoAdapter = TodoAdapter(testData)
 
         binding.recyclerView.apply {
             layoutManager = managerLayout
             adapter = todoAdapter
         }
 
+        todoViewModel.allData.observe(this) { todoData ->
+            todoAdapter.setData(todoData)
+        }
 
 
 
+        binding.btnAdd.setOnClickListener {
+            val text = binding.etTodo.text
+            if (text.isEmpty()) {
+                Toast.makeText(this, "할일을 입력하세요", Toast.LENGTH_SHORT).show()
+            } else {
+                val entitiy = TodoEntity(todo = "$text")
+                todoViewModel.insertData(entitiy)
+            }
+        }
 
     }
 }

@@ -1,6 +1,13 @@
 # Todo-MVVM-Kotlin
 
+
+**추가할 내용들**
+1. 프로젝트 설명에 "이 프로젝트는 Todo-MVVM-Java 프로젝트의 연장선상으로 ~~~"
+2. todo-mvvm-java 프로젝트와 todo-mvvm-kotlin 프로젝트의 코드 차이점
+3. todo-mvvm-java, todo-mvvm-kotlin를 진행하며 느낀점, 배운점 등
+
 ### 프로젝트 설명
+이 프로젝트는 Todo-MVVM-Java 프로젝트의 연장선상으로 ~~~
 
 이 프로젝트는 코틀린 **MVVM 패턴 실습**에 초점을 맞춘 간단한 TodoList 앱입니다.
 Room 데이터베이스를 활용하여 로컬에 데이터를 저장하며, View ↔ ViewModel ↔ Model 간의 역할을 분리하는 것을 실습하였습니다.

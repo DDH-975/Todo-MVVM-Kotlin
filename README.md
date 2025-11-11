@@ -1,7 +1,3 @@
-**추가할 내용들**
-2. todo-mvvm-java 프로젝트 대비 todo-mvvm-kotlin 프로젝트에 추가된 코드들
-3. todo-mvvm-java, todo-mvvm-kotlin를 진행하며 느낀점, 배운점 등
-
 # Todo-MVVM-Kotlin
 
 ### 프로젝트 설명

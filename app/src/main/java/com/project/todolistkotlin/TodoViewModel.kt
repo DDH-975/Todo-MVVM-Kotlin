@@ -23,7 +23,6 @@ class TodoViewModel(private val repo: TodoRepository) : ViewModel() {
             repo.deleteDataById(id)
         }
     }
-
 }
 
 class TodoViewModelFactory(private val repo: TodoRepository) : ViewModelProvider.Factory {

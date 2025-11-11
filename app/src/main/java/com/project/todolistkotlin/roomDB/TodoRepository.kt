@@ -7,7 +7,6 @@ import androidx.lifecycle.LiveData
 class TodoRepository private constructor(private val dao: TodoDao) {
     val allData: LiveData<List<TodoEntity>> = dao.getAllData()
 
-
     suspend fun insertData(todoEntity: TodoEntity) {
         dao.setInsertTodo(todoEntity)
     }
@@ -20,7 +19,6 @@ class TodoRepository private constructor(private val dao: TodoDao) {
     companion object {
         @Volatile
         private var INSTANCE: TodoRepository? = null
-
         fun getInstance(application: Application): TodoRepository =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: TodoRepository(

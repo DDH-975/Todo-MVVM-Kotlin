@@ -1,16 +1,14 @@
-# Todo-MVVM-Kotlin
-
-
 **추가할 내용들**
-1. 프로젝트 설명에 "이 프로젝트는 Todo-MVVM-Java 프로젝트의 연장선상으로 ~~~"
-2. todo-mvvm-java 프로젝트와 todo-mvvm-kotlin 프로젝트의 코드 차이점
+2. todo-mvvm-java 프로젝트 대비 todo-mvvm-kotlin 프로젝트에 추가된 코드들
 3. todo-mvvm-java, todo-mvvm-kotlin를 진행하며 느낀점, 배운점 등
 
-### 프로젝트 설명
-이 프로젝트는  [Todo-MVVM-Java](https://github.com/DDH-975/Todo-MVVM-Java) 프로젝트의 연장선상으로 ~~~
+# Todo-MVVM-Kotlin
 
-이 프로젝트는 코틀린 **MVVM 패턴 실습**에 초점을 맞춘 간단한 TodoList 앱입니다.
-Room 데이터베이스를 활용하여 로컬에 데이터를 저장하며, View ↔ ViewModel ↔ Model 간의 역할을 분리하는 것을 실습하였습니다.
+### 프로젝트 설명
+이 프로젝트는 [Todo-MVVM-Java](https://github.com/DDH-975/Todo-MVVM-Java) 프로젝트의 연장선상으로,
+기존 Java로 구현했던 MVVM 구조를 Kotlin 언어로 재구현하며 문법적 차이와 구조적 개선점을 학습하는 데 목적을 두었습니다.  
+이를 바탕으로 코틀린 MVVM 패턴 실습에 초점을 맞춘 간단한 TodoList 앱을 구현하였으며,
+Room 데이터베이스를 활용해 로컬 데이터를 저장하고 View ↔ ViewModel ↔ Model 간의 역할 분리를 실습하였습니다
 
 ---
 
@@ -38,17 +36,17 @@ LiveData를 반환하여 데이터 변경 시 자동으로 UI에 반영되도록
 ```kotlin
 @Dao
 interface TodoDao {
-    @Query("SELECT * FROM TodoEntity")
+    @Query("SELECT * FROM TodoData")
     fun getAllData(): LiveData<List<TodoEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertData(todo: TodoEntity)
+    @Insert(onConflict = OnConflictStrategy.Companion.REPLACE)
+    fun setInsertTodo(todo: TodoEntity)
 
-    @Query("DELETE FROM TodoEntity")
-    suspend fun deleteAll()
+    @Query("DELETE FROM TodoData")
+    fun deleteAllTodo()
 
-    @Query("DELETE FROM TodoEntity WHERE id = :id")
-    suspend fun deleteById(id: Int)
+    @Query("DELETE FROM TodoData WHERE id = :id")
+    fun deleteDataWhereId(id: Int)
 }
 ```
 
@@ -56,23 +54,31 @@ interface TodoDao {
 
 ### 2. Repository
 
-Repository는 DB 접근 로직을 캡슐화하여 ViewModel이 데이터 소스를 직접 알지 않아도 되도록 합니다.
-비동기 처리를 위해 **코루틴**을 사용합니다.
+Repository는 DB 접근 로직을 캡슐화하여 ViewModel이 데이터 소스를 직접 알지 않아도 되도록 합니다. <br>
+비동기 처리를 위해 **suspend**로 메서드를 선언하여 **코루틴**에서 메서드가 작동하도록 합니다.
 
 ```kotlin
-class TodoRepository(private val dao: TodoDao) {
+class TodoRepository private constructor(private val dao: TodoDao) {
     val allData: LiveData<List<TodoEntity>> = dao.getAllData()
 
-    suspend fun insert(todo: TodoEntity) {
-        dao.insertData(todo)
+    suspend fun insertData(todoEntity: TodoEntity) {
+        dao.setInsertTodo(todoEntity)
     }
 
-    suspend fun deleteAll() {
-        dao.deleteAll()
+    suspend fun deleteDataById(id: Int) {
+        dao.deleteDataWhereId(id)
     }
 
-    suspend fun deleteById(id: Int) {
-        dao.deleteById(id)
+
+    companion object {
+        @Volatile
+        private var INSTANCE: TodoRepository? = null
+        fun getInstance(application: Application): TodoRepository =
+            INSTANCE ?: synchronized(this) {
+                INSTANCE ?: TodoRepository(
+                    TodoDataBase.getInstance(application).dao()
+                ).also { INSTANCE = it }
+            }
     }
 }
 ```
@@ -81,38 +87,54 @@ class TodoRepository(private val dao: TodoDao) {
 
 ### 3. ViewModel
 
-ViewModel은 Repository를 통해 데이터를 가져오고, `LiveData`로 관리하여 View에 전달합니다.
-UI 관련 로직과 데이터 보존 역할을 담당합니다.
+ViewModel은 Repository를 통해 데이터를 가져오고, 이를 `LiveData`로 관리하여 View에 전달합니다. <br>
+또한, 화면 회전 등의 생명주기 변화에도 데이터를 안전하게 보존하며, UI 관련 로직을 담당하는 핵심 계층입니다.
 
 ```kotlin
-class TodoViewModel(application: Application): AndroidViewModel(application) {
-    private val repository: TodoRepository
-    val allTodos: LiveData<List<TodoEntity>>
+class TodoViewModel(private val repo: TodoRepository) : ViewModel() {
+    val allData: LiveData<List<TodoEntity>> = repo.allData
 
-    init {
-        val dao = TodoDatabase.getDatabase(application).todoDao()
-        repository = TodoRepository(dao)
-        allTodos = repository.allData
+    fun insertData(tododata: TodoEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repo.insertData(tododata)
+        }
     }
 
-    fun insert(todo: TodoEntity) = viewModelScope.launch(Dispatchers.IO) {
-        repository.insert(todo)
-    }
-
-    fun deleteAll() = viewModelScope.launch(Dispatchers.IO) {
-        repository.deleteAll()
-    }
-
-    fun deleteById(id: Int) = viewModelScope.launch(Dispatchers.IO) {
-        repository.deleteById(id)
+    fun deleteById(id: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repo.deleteDataById(id)
+        }
     }
 }
+
+class TodoViewModelFactory(private val repo: TodoRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TodoViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return TodoViewModel(repo) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
 ```
 
-💡 **AndroidViewModel을 사용한 이유**
+ViewModel에서는 코루틴을 사용하기 위해 **viewModelScope**를 활용하였습니다. <br>
+이를 통해 Repository에 선언된 `suspend` 함수들을 **Dispatchers.IO**에서 비동기적으로 실행하여 메인 스레드를 차단하지 않고 안전하게 데이터 작업을 처리할 수 있습니다.
 
-* Room 데이터베이스 초기화 시 Application Context가 필요하기 때문입니다.
-* 일반 ViewModel은 Context에 접근할 수 없으나, AndroidViewModel은 생성자를 통해 안전하게 Context를 전달받을 수 있습니다.
+```kotlin
+    fun insertData(tododata: TodoEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repo.insertData(tododata)
+        }
+    }
+
+    fun deleteById(id: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repo.deleteDataById(id)
+        }
+    }
+```
 
 ---
 
@@ -121,17 +143,15 @@ class TodoViewModel(application: Application): AndroidViewModel(application) {
 #### ViewModel 초기화 (MainActivity)
 
 ```kotlin
-viewModel = ViewModelProvider(
-    this, ViewModelProvider.AndroidViewModelFactory.getInstance(application)
-).get(TodoViewModel::class.java)
+ todoViewModel = ViewModelProvider(this, TodoViewModelFactory(repo) )[TodoViewModel::class.java]
 ```
 
 #### LiveData 관찰 (자동 업데이트)
 
 ```kotlin
-viewModel.allTodos.observe(this) { todos ->
-    adapter.submitList(todos)
-}
+ todoViewModel.allData.observe(this) { todoData ->
+            todoAdapter.setData(todoData)
+        }
 ```
 
 ➡️ LiveData 값이 변경될 때마다 RecyclerView UI가 자동 갱신됩니다.
@@ -139,32 +159,36 @@ viewModel.allTodos.observe(this) { todos ->
 #### 사용자 입력 처리
 
 ```kotlin
-binding.btnAdd.setOnClickListener {
-    val todoText = binding.etTodo.text.toString().trim()
-    if (todoText.isEmpty()) {
-        Toast.makeText(this, "할 일을 입력해주세요.", Toast.LENGTH_SHORT).show()
-    } else {
-        val todo = TodoEntity(todo = todoText)
-        viewModel.insert(todo)
-    }
-}
+ binding.btnAdd.setOnClickListener {
+            val text = binding.etTodo.text
+            if (text.isEmpty()) {
+                Toast.makeText(this, "할일을 입력하세요", Toast.LENGTH_SHORT).show()
+            } else {
+                val entitiy = TodoEntity(todo = "$text")
+                todoViewModel.insertData(entitiy)
+            }
+        }
 ```
 
 #### 삭제 콜백 인터페이스
 
 ```kotlin
-interface OnDeleteClickListener {
-    fun onDeleteClick(id: Int)
+fun interface OndeleteClickListener {
+    fun deleteClick(id: Int)
 }
 ```
 
 ```kotlin
-override fun onBindViewHolder(holder: TodoViewHolder, position: Int) {
-    holder.binding.tvTodo.text = data[position].todo
-    holder.binding.btnDelete.setOnClickListener {
-        listener.onDeleteClick(data[position].id)
+override fun onBindViewHolder(holder: TodoAdapter.ViewHolder, position: Int) {
+        val pos = holder.bindingAdapterPosition
+        if (pos != RecyclerView.NO_POSITION) {
+            holder.tvTodo.text = todoData.get(pos).todo
+
+            holder.btnDelete.setOnClickListener { it ->
+                listener.deleteClick(todoData.get(pos).id)
+            }
+        }
     }
-}
 ```
 
 ➡️ 삭제 버튼 클릭 → Adapter 콜백 실행 → ViewModel의 `deleteById()` 호출 → Repository → Room DB 삭제 → LiveData 변경 → UI 자동 반영
@@ -177,6 +201,60 @@ override fun onBindViewHolder(holder: TodoViewHolder, position: Int) {
 2. **ViewModel** → `Repository` 통해 DB 요청 위임
 3. **Repository** → `Room DB` 접근 (비동기 처리)
 4. **DB 변경** → `LiveData` 업데이트 → `ViewModel` → `View` 자동 반영
+
+---
+
+## 🧩 Todo-MVVM-Kotlin에서 개선·추가된 코드
+### 1️⃣ Repository의 `companion object` - 싱클톤 패턴 구현
+```kotlin
+   companion object {
+        @Volatile
+        private var INSTANCE: TodoRepository? = null
+        fun getInstance(application: Application): TodoRepository =
+            INSTANCE ?: synchronized(this) {
+                INSTANCE ?: TodoRepository(
+                    TodoDataBase.getInstance(application).dao()
+                ).also { INSTANCE = it }
+            }
+    }
+```
+
+이 코드의 목적은 **`repository`를 앱 전체에서 단 한번만 생성**하기 위해서입니다.
+`repository`는 내부적으로 `RoomDB(TodoDataBase)`를 사용하는데 RoomDB가 하나의 앱에 여러개 존재하게 되면 DB파일 충돌, 데이터 불일치 문제등이 발생하게 됩니다.
+그래서 `repository`를 **싱글톤**으로 구현하여 모든 `ViewModel`이 하나의 **DB 접근 통로**를 공유하도록 하였습니다.
+
+### ⚙ 코드가 동작하는 방식
+1. `getInstance()` 를 호출할 때마다
+    - `INSTANCE` 가 null이면 새로 만들고,
+    - 이미 있다면 기존 인스턴스를 반환.
+
+2. `@Volatile` : 여러 스레드에서 동시에 접근해도 인스턴스가 제대로 보이도록 보장.
+3. `synchronized(this)` : 여러 스레드가 동시에 `getInstance()`를 호출해도한 번만 생성되게 잠금 처리.
+
+---
+
+### 2️⃣ ViewModel의 TodoViewModelFactory클래스 - ViewModel을 안전하게 만드는 ‘공장 클래스’
+
+```kotlin
+class TodoViewModelFactory(private val repo: TodoRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TodoViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return TodoViewModel(repo) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+```
+`TodoViewModelFactory`는 ViewModel 생성 시 필요한 의존성(`Repository`)을 안전하게 주입하기 위해 사용하는 클래스입니다.  
+기본적으로 `ViewModelProvider`는 매개변수가 없는 기본 생성자를 호출하지만, 이 프로젝트의 `TodoViewModel`은 `TodoRepository`를 생성자에서 받아야 하기 때문에 **직접 Factory를 구현하여 ViewModelProvider에 전달**해야 합니다.
+
+즉 `TodoViewModelFactory`클래스는 ViewModel이 외부 의존성(Repository 등)을 필요로 할 때 **안정적으로 인스턴스를 생성하고 관리**할 수 있게 도와주는 역할을 합니다.
+
+### ⚙ 코드가 동작하는 방식
+1. `ViewModelProvider`가 `create()`를 호출할 때 → `modelClass`가 `TodoViewModel`인지 확인
+2. 맞다면 `TodoViewModel(repo)`를 생성하고 반환
+3. 잘못된 타입이면 `IllegalArgumentException` 예외를 발생시켜 타입 안전성을 보장
 
 ---
 

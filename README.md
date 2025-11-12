@@ -13,7 +13,7 @@ Room 데이터베이스를 활용해 로컬 데이터를 저장하고 View ↔ V
 * **언어 (Languages)**: Kotlin, XML
 * **개발 환경**: Android Studio
 * **아키텍처 (Architecture)**: MVVM (Model-View-ViewModel)
-* **데이터베이스 (Database)**: Room
+* **데이터베이스 (Database)**: RoomDB
 * **비동기 처리 (Async)**: Kotlin Coroutines, LiveData
 
 ---

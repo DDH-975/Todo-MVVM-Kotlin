@@ -115,7 +115,7 @@ class TodoViewModelFactory(private val repo: TodoRepository) : ViewModelProvider
 
 ```
 
-ViewModel에서 코루틴을 사용하기 위해 **viewModelScope**를 활용하였습니다. <br>
+ViewModel에서 코루틴을 사용하기 위해 `viewModelScope` 를 활용하였습니다. <br>
 이를 통해 Repository에 선언된 `suspend` 함수들을 **Dispatchers.IO**에서 비동기적으로 실행하여 메인 스레드를 차단하지 않고 안전하게 데이터 작업을 처리할 수 있습니다.
 
 ```kotlin

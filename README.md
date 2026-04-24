@@ -160,8 +160,8 @@ todoViewModel.allData.observe(this) { todoData ->
 @Insert
 suspend fun insertData(todo: TodoEntity)
 ```
-DB에 데이터를 쓰는 작업은 메인 스레드에서 실행할 경우 ANR이 발생할 수 있음
-반드시 Coroutine을 사용하여 백그라운드 스레드에서 처리
+- DB에 데이터를 쓰는 작업은 메인 스레드에서 실행할 경우 ANR이 발생할 수 있음
+- 반드시 Coroutine을 사용하여 백그라운드 스레드에서 처리
 ```kotlin
 viewModelScope.launch(Dispatchers.IO) {
     repo.insertData(todo)
@@ -181,9 +181,6 @@ suspend fun getAllData(): List<TodoEntity>
 - 조회 (LiveData 반환) → Coroutine 필요 없음 (Room이 내부적으로 비동기 처리)
 - 데이터 변경 (Insert / Update / Delete) → Coroutine 필요
 - suspend 함수 기반 조회 → Coroutine 필요
-
-💡 한 줄 요약
-LiveData는 “자동 비동기 데이터 흐름”, Coroutine은 “직접 비동기 작업 처리”이다.
 
 ### ✨ 학습 인사이트
 
